@@ -5,3 +5,28 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # NuGet packages of every project in the solution. Minor and patch bumps arrive as one grouped pull request.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # ABP is the package's floor: $(AbpVersion) in Directory.Build.props is raised by hand, deliberately.
+      # This also holds back ABP security updates, so ABP advisories show only as Dependabot alerts.
+      - dependency-name: "Volo.Abp.*"
+      # Microsoft.* and System.* majors track the .NET major; take them together with a target-framework change.
+      - dependency-name: "Microsoft.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+
+  # Base images of the Dockerfile in /runner.
+  - package-ecosystem: docker
+    directory: /runner
+    schedule:
+      interval: weekly
