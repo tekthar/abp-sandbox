@@ -27,6 +27,12 @@ Knowing whether the sandbox can run, and choosing its provider by a setting.
   host's own pages too. `AgentToolsWithSandbox` lists them only then, and a tool given earlier refuses with why.
 - deploy/aws: `ProviderPolicy` allows `ecs:DescribeClusters` on the cluster, for the check.
 
+### Fixed
+
+- AbpSandbox.Agents' tools reach `Inside` the run's scope: the container is the agent's own and changes nothing of the
+  host's, so a tool set to run no longer asks as if it reached beyond the scope (AbpAgent's rule for a changing tool
+  that names no item), and its answers aren't read for item keys.
+
 ## [0.1.0] - 2026-11-13
 
 The first release: untrusted work in containers, on Docker and AWS Fargate, with tools for AbpAgent.

@@ -66,19 +66,19 @@ public sealed class SandboxAgentTools(ISandbox sandbox, IOptions<SandboxAgentToo
                 script = new { type = "string", description = "The sh script to run, in the work folder." },
                 files = FilesSchema,
                 outputs = new { type = "array", items = new { type = "string" }, description = "Files or folders in the work folder to give back." },
-            }, "script"), ReadsOnly: false, FromPlugin: false) { OptIn = true },
+            }, "script"), ReadsOnly: false, FromPlugin: false, Reach: AgentToolReach.Inside) { OptIn = true },
         new(Exec, "Run in this conversation's sandbox",
             "Runs a shell script in this conversation's Linux container (made the first time, with no network), which keeps "
             + "its files between calls until it's idle for a while. Gives back the exit code, stdout and stderr.",
             Schema(new { script = new { type = "string", description = "The sh script to run, in the work folder." } }, "script"),
-            ReadsOnly: false, FromPlugin: false) { OptIn = true },
+            ReadsOnly: false, FromPlugin: false, Reach: AgentToolReach.Inside) { OptIn = true },
         new(Put, "Put files in this conversation's sandbox",
             "Puts files in this conversation's container, in its work folder.",
-            Schema(new { files = FilesSchema }, "files"), ReadsOnly: false, FromPlugin: false) { OptIn = true },
+            Schema(new { files = FilesSchema }, "files"), ReadsOnly: false, FromPlugin: false, Reach: AgentToolReach.Inside) { OptIn = true },
         new(Get, "Read files from this conversation's sandbox",
             "Reads files or folders from this conversation's container: text as text, other files in base64.",
             Schema(new { paths = new { type = "array", items = new { type = "string" }, description = "Relative to the work folder; \".\" is all of it." } }, "paths"),
-            ReadsOnly: true, FromPlugin: false) { OptIn = true },
+            ReadsOnly: true, FromPlugin: false, Reach: AgentToolReach.Inside) { OptIn = true },
     ];
 
     public bool Owns(string name) => name is Run or Exec or Put or Get;

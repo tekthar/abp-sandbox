@@ -101,7 +101,8 @@ container instead of preparing it again. Production runs where creating containe
 - A host can run package checks without any of them touching its own process, and can check a plugin before it
   loads one.
 - Agents get a disposable computer with no network: AbpSandbox.Agents' tools are opt-in, ask first (they aren't
-  read-only), are refused in read-only runs, take only what the model gives them (text or base64; a record's files
+  read-only), reach inside the run's scope (the container is the agent's own; were it ever given a network, they
+  would reach outside), are refused in read-only runs, take only what the model gives them (text or base64; a record's files
   come through the host's own tools, which check rights), and cap what they give back.
 - A sandbox is only as strong as its provider. Docker's containers share the server's kernel; that is acceptable for
   development and for hosts that run their own trusted checks, not for code from strangers on a server with secrets.

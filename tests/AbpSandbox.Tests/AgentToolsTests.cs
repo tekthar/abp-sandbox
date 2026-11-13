@@ -30,6 +30,8 @@ public class AgentToolsTests
         (SandboxAgentTools tools, _, _) = Make();
         Assert.All(tools.Tools, t => Assert.True(t.OptIn));
         Assert.All(tools.Tools, t => Assert.False(t.AlwaysAsks));
+        // Inside the run's scope: the container is the agent's own and changes nothing of the host's.
+        Assert.All(tools.Tools, t => Assert.Equal(AgentToolReach.Inside, t.Reach));
         Assert.Equal([SandboxAgentTools.Get], tools.Tools.Where(t => t.ReadsOnly).Select(t => t.Name));
     }
 
