@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AbpSandbox.Contracts/AbpSandbox.Contracts.csproj" />
+    <Project Path="src/AbpSandbox/AbpSandbox.csproj" />
+    <Project Path="src/AbpSandbox.Docker/AbpSandbox.Docker.csproj" />
+    <Project Path="src/AbpSandbox.Agents/AbpSandbox.Agents.csproj" />
+    <Project Path="src/AbpSandbox.Remote/AbpSandbox.Remote.csproj" />
+    <Project Path="src/AbpSandbox.Fargate/AbpSandbox.Fargate.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AbpSandbox.Tests/AbpSandbox.Tests.csproj" />
+  </Folder>
+</Solution>

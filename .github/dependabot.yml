@@ -1,0 +1,7 @@
+# Keeps the actions ci.yml pins by commit SHA current (the version is the comment after each pin).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

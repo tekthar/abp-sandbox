@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>AbpSandbox: untrusted work in containers for ABP hosts. Throwaway runs, kept sessions, prepared images, limits and the sweep; a provider (Docker, AWS Fargate) runs the containers.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AbpSandbox.Contracts\AbpSandbox.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Core" Version="$(AbpVersion)" />
+  </ItemGroup>
+
+</Project>

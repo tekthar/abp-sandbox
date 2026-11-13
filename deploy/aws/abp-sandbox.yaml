@@ -1,0 +1,292 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AbpSandbox on AWS Fargate (docs/adr/0002): a network with no way out but the jobs bucket and the image registry,
+  a DNS firewall that answers only AWS's own names, the jobs bucket, the registries, the cluster, the task execution
+  role, and the policy the server that runs AbpSandbox needs. Tasks get no task role.
+
+Parameters:
+  Name:
+    Type: String
+    Default: abp-sandbox
+    AllowedPattern: "[a-z][a-z0-9-]{2,30}"
+    Description: A prefix for what this makes.
+  VpcCidr:
+    Type: String
+    Default: 10.83.0.0/16
+    Description: The sandbox's own network, unconnected to any other.
+
+Resources:
+  # The network: two private subnets with no internet gateway and no NAT. The only ways out are the S3 gateway
+  # endpoint (a route) and the registry's interface endpoints (inside the network).
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Ref Name }]
+
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 12]]
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${Name}-a" }]
+
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 12]]
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${Name}-b" }]
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "${Name}-closed" }]
+
+  SubnetARoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref SubnetA, RouteTableId: !Ref RouteTable }
+
+  SubnetBRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref SubnetB, RouteTableId: !Ref RouteTable }
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: AbpSandbox tasks - HTTPS out, which the routes take only to the bucket and the registry
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: The routes reach only the S3 gateway and the registry endpoints }
+      Tags: [{ Key: Name, Value: !Sub "${Name}-tasks" }]
+
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: AbpSandbox registry endpoints - HTTPS in from the tasks
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, SourceSecurityGroupId: !Ref TaskSecurityGroup }
+      SecurityGroupEgress:
+        - { IpProtocol: "-1", CidrIp: 127.0.0.1/32, Description: Nothing out }
+      Tags: [{ Key: Name, Value: !Sub "${Name}-endpoints" }]
+
+  # S3 through the gateway: only the jobs bucket, and the registry's layer bucket for pulling images.
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Gateway
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      RouteTableIds: [!Ref RouteTable]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: JobsOnly
+            Effect: Allow
+            Principal: "*"
+            Action: [s3:GetObject, s3:PutObject]
+            Resource: !Sub "${JobsBucket.Arn}/*"
+          - Sid: RegistryLayers
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "arn:${AWS::Partition}:s3:::prod-${AWS::Region}-starport-layer-bucket/*"
+
+  EcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Interface
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref SubnetA, !Ref SubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+
+  EcrDockerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Interface
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref SubnetA, !Ref SubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+
+  # DNS: AWS's own names answer; every other name is NXDOMAIN, so nothing leaves in a DNS query.
+  AwsNames:
+    Type: AWS::Route53Resolver::FirewallDomainList
+    Properties:
+      Name: !Sub "${Name}-aws"
+      Domains: ["amazonaws.com.", "*.amazonaws.com."]
+
+  EveryName:
+    Type: AWS::Route53Resolver::FirewallDomainList
+    Properties:
+      Name: !Sub "${Name}-every"
+      Domains: ["*."]
+
+  DnsRules:
+    Type: AWS::Route53Resolver::FirewallRuleGroup
+    Properties:
+      Name: !Sub "${Name}-dns"
+      FirewallRules:
+        - { Priority: 100, Action: ALLOW, FirewallDomainListId: !Ref AwsNames }
+        - { Priority: 200, Action: BLOCK, BlockResponse: NXDOMAIN, FirewallDomainListId: !Ref EveryName }
+
+  DnsRulesOnVpc:
+    Type: AWS::Route53Resolver::FirewallRuleGroupAssociation
+    Properties:
+      Name: !Sub "${Name}-dns"
+      FirewallRuleGroupId: !Ref DnsRules
+      VpcId: !Ref Vpc
+      Priority: 101
+      MutationProtection: ENABLED
+
+  # Jobs and results: private, encrypted, TLS only, gone after a day.
+  JobsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }]
+      PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      LifecycleConfiguration:
+        Rules:
+          - { Id: jobs-go-after-a-day, Status: Enabled, ExpirationInDays: 1, AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 } }
+      Tags: [{ Key: abp-sandbox, Value: "1" }]
+
+  JobsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref JobsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt JobsBucket.Arn, !Sub "${JobsBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+
+  # The runner's image (runner/Dockerfile) and the operator's work images: immutable tags, scanned on push.
+  RunnerRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${Name}/runner"
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: { ScanOnPush: true }
+
+  ImagesRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${Name}/images"
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: { ScanOnPush: true }
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref Name
+      CapacityProviders: [FARGATE, FARGATE_SPOT]
+      Tags: [{ Key: abp-sandbox, Value: "1" }]
+
+  # Pulls the images; nothing else. Tasks have no task role: the courier's links are presigned.
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition: { StringEquals: { "aws:SourceAccount": !Ref AWS::AccountId } }
+      Policies:
+        - PolicyName: pull
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Effect: Allow, Action: ecr:GetAuthorizationToken, Resource: "*" }
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource: [!GetAtt RunnerRepository.Arn, !GetAtt ImagesRepository.Arn]
+
+  # What the server running AbpSandbox needs: attach it to that server's role.
+  ProviderPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: AbpSandbox's Fargate provider - start, watch and stop sandbox tasks; write jobs and read results
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: Tasks
+            Effect: Allow
+            Action: ecs:RunTask
+            Resource: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/abpsandbox-*"
+            Condition: { ArnEquals: { "ecs:cluster": !GetAtt Cluster.Arn } }
+          - Sid: TaskState
+            Effect: Allow
+            Action: [ecs:StopTask, ecs:DescribeTasks]
+            Resource: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/${Name}/*"
+          - Sid: ListTasks
+            Effect: Allow
+            Action: ecs:ListTasks
+            Resource: "*"
+            Condition: { ArnEquals: { "ecs:cluster": !GetAtt Cluster.Arn } }
+          - Sid: Definitions
+            Effect: Allow
+            Action: [ecs:RegisterTaskDefinition, ecs:DescribeTaskDefinition]
+            Resource: "*"
+          - Sid: TagOnCreate
+            Effect: Allow
+            Action: ecs:TagResource
+            Resource: "*"
+            Condition: { StringEquals: { "ecs:CreateAction": [RunTask, RegisterTaskDefinition] } }
+          - Sid: PassExecutionRole
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !GetAtt ExecutionRole.Arn
+            Condition: { StringEquals: { "iam:PassedToService": ecs-tasks.amazonaws.com } }
+          - Sid: Jobs
+            Effect: Allow
+            Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+            Resource: !Sub "${JobsBucket.Arn}/*"
+          - Sid: JobsList
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt JobsBucket.Arn
+
+Outputs:
+  Cluster:
+    Value: !Ref Cluster
+    Description: AbpSandbox:Fargate:Cluster
+  Subnets:
+    Value: !Join [",", [!Ref SubnetA, !Ref SubnetB]]
+    Description: AbpSandbox:Fargate:Subnets
+  SecurityGroup:
+    Value: !Ref TaskSecurityGroup
+    Description: AbpSandbox:Fargate:SecurityGroups
+  ExecutionRoleArn:
+    Value: !GetAtt ExecutionRole.Arn
+    Description: AbpSandbox:Fargate:ExecutionRoleArn
+  Bucket:
+    Value: !Ref JobsBucket
+    Description: AbpSandbox:Fargate:Bucket
+  RunnerRepository:
+    Value: !GetAtt RunnerRepository.RepositoryUri
+    Description: Push runner/ here; AbpSandbox:Remote:RunnerImage is its digest
+  ImagesRepository:
+    Value: !GetAtt ImagesRepository.RepositoryUri
+    Description: Push the work images here; AbpSandbox:Images names them by digest
+  ProviderPolicyArn:
+    Value: !Ref ProviderPolicy
+    Description: Attach to the role of the server that runs AbpSandbox

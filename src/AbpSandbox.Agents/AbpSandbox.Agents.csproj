@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>AbpSandbox for AbpAgent: tools that give an agent a computer with no network (run a command, keep a session, put and get files), opt-in and asking first.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AbpSandbox\AbpSandbox.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Only the contracts: AbpAgent stays free of containers, as AbpAi.Agents adapts AbpAi. -->
+    <PackageReference Include="AbpAgent.Contracts" Version="0.5.0" />
+  </ItemGroup>
+
+</Project>

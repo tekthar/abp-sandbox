@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>AbpSandbox's base for cloud providers (AWS Fargate, Azure Container Instances): a task of three containers, a runner beside the work, and jobs through object storage with signed links.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AbpSandbox\AbpSandbox.csproj" />
+  </ItemGroup>
+
+</Project>

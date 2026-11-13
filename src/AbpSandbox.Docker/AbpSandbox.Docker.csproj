@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>AbpSandbox's Docker provider: containers through the Docker Engine API (a Unix socket, a Windows named pipe or TCP), with no network, a read-only root, no capabilities and a user that isn't root.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AbpSandbox\AbpSandbox.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>AbpSandbox's AWS Fargate provider: each sandbox is an ECS task on Fargate (its own small virtual machine) in a network the template closes, with jobs through S3 presigned URLs.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AbpSandbox.Remote\AbpSandbox.Remote.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.ECS" Version="4.0.111.1" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.104.12" />
+  </ItemGroup>
+
+</Project>

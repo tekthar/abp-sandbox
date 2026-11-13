@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Public contracts of AbpSandbox: running untrusted work in throwaway or kept containers, and the provider seam that runs them.</Description>
+  </PropertyGroup>
+
+  <!-- Nothing of any host's, ABP's or a container engine's: plain .NET. -->
+
+</Project>
