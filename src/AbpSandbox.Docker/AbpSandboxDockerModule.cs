@@ -10,6 +10,6 @@ public class AbpSandboxDockerModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         context.Services.Configure<DockerSandboxOptions>(context.Services.GetConfiguration().GetSection(DockerSandboxOptions.Section));
-        context.Services.AddSingleton<ISandboxProvider, DockerSandboxProvider>();
+        context.Services.AddSandboxProvider<DockerSandboxProvider>("docker");
     }
 }

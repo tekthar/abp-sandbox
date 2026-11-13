@@ -14,6 +14,9 @@ public interface ISandboxProvider
 
     SandboxCapabilities Capabilities { get; }
 
+    /// <summary>Whether it can run containers now (its engine or service answers, its settings are there); quick, and never throws.</summary>
+    Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default) => Task.FromResult(SandboxAvailability.Yes);
+
     /// <summary>Makes a container, not yet started, with its work folder empty.</summary>
     Task<ISandboxContainer> CreateAsync(SandboxContainerSpec spec, CancellationToken cancellationToken = default);
 

@@ -6,6 +6,27 @@ All notable changes to AbpSandbox are written here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
+Knowing whether the sandbox can run, and choosing its provider by a setting.
+
+### Changed (breaking)
+
+- **The provider is chosen by `AbpSandbox:Provider`** (`docker`, `fargate`): each provider's module registers itself
+  under its name (`AddSandboxProvider<T>(name)`), and none runs until the setting names one, even with several modules
+  loaded. A 0.1.0 host that depended on `AbpSandboxDockerModule` sets `"AbpSandbox": { "Provider": "docker" }`.
+  `AddRemoteSandbox` takes the name too.
+
+### Added
+
+- `ISandbox.CheckAsync(image)`: whether the sandbox can run now (`SandboxAvailability`, with why not): a provider is
+  set and answers (Docker's ping; Fargate's cluster active and its bucket answering; the runner image set), its answer
+  kept for `AbpSandbox:AvailabilityCacheTime` (a minute); and, given an image's name, the settings pin it.
+  `ISandboxProvider`, `ISandboxTaskPlatform` and `ISandboxObjectStore` have a `CheckAsync` that says yes by default.
+- `SandboxAgentTools.CheckAsync` and `AvailableToolsAsync`: agents' tools only while the sandbox is available, for a
+  host's own pages too. `AgentToolsWithSandbox` lists them only then, and a tool given earlier refuses with why.
+- deploy/aws: `ProviderPolicy` allows `ecs:DescribeClusters` on the cluster, for the check.
+
 ## [0.1.0] - 2026-11-13
 
 The first release: untrusted work in containers, on Docker and AWS Fargate, with tools for AbpAgent.

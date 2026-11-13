@@ -237,6 +237,10 @@ Resources:
             Effect: Allow
             Action: [ecs:StopTask, ecs:DescribeTasks]
             Resource: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/${Name}/*"
+          - Sid: Cluster
+            Effect: Allow
+            Action: ecs:DescribeClusters
+            Resource: !GetAtt Cluster.Arn
           - Sid: ListTasks
             Effect: Allow
             Action: ecs:ListTasks

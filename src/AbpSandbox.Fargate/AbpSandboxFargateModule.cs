@@ -21,7 +21,7 @@ public class AbpSandboxFargateModule : AbpModule
         context.Services.Configure<FargateSandboxOptions>(context.Services.GetConfiguration().GetSection(FargateSandboxOptions.Section));
         context.Services.TryAddSingleton<IAmazonECS>(sp => Region(sp) is { } region ? new AmazonECSClient(region) : new AmazonECSClient());
         context.Services.TryAddSingleton<IAmazonS3>(sp => Region(sp) is { } region ? new AmazonS3Client(region) : new AmazonS3Client());
-        context.Services.AddRemoteSandbox<FargateTaskPlatform, S3ObjectStore>(context.Services.GetConfiguration());
+        context.Services.AddRemoteSandbox<FargateTaskPlatform, S3ObjectStore>(context.Services.GetConfiguration(), "fargate");
     }
 
     private static RegionEndpoint? Region(IServiceProvider services) =>

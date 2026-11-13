@@ -47,8 +47,12 @@ are each their own small virtual machine.
 public class MyModule : AbpModule { }
 ```
 
+Nothing runs until the settings name a provider (`docker`, `fargate`); a host may load several and pick by site.
+`ISandbox.CheckAsync` says whether the sandbox can run now, and why not.
+
 ```json
 "AbpSandbox": {
+  "Provider": "docker",
   "Images": { "alpine": "alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc" },
   "MaxTime": "00:05:00"
 }

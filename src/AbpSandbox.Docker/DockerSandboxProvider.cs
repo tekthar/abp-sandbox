@@ -44,6 +44,20 @@ public sealed class DockerSandboxProvider(IOptions<DockerSandboxOptions> options
 
     public SandboxCapabilities Capabilities { get; } = new(Sessions: true, Preparation: true);
 
+    public async Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default)
+    {
+        using CancellationTokenSource quick = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        quick.CancelAfter(TimeSpan.FromSeconds(3));
+        try
+        {
+            return await engine.PingAsync(quick.Token) ? SandboxAvailability.Yes : SandboxAvailability.No("The Docker engine doesn't answer its ping.");
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or OperationCanceledException or TimeoutException or System.Net.Sockets.SocketException)
+        {
+            return SandboxAvailability.No($"The Docker engine at {options.Value.Endpoint ?? DockerEngine.DefaultEndpoint} doesn't answer.");
+        }
+    }
+
     public async Task<ISandboxContainer> CreateAsync(SandboxContainerSpec spec, CancellationToken cancellationToken = default)
     {
         await EnsureImageAsync(spec.Image, cancellationToken);

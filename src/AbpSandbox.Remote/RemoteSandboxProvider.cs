@@ -32,6 +32,24 @@ public class RemoteSandboxProvider(
 
     public SandboxCapabilities Capabilities { get; } = new(Sessions: true, Preparation: false);
 
+    public async Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(options.Value.RunnerImage))
+        {
+            return SandboxAvailability.No("The sandbox's runner image isn't set (AbpSandbox:Remote:RunnerImage).");
+        }
+
+        try
+        {
+            SandboxAvailability tasks = await platform.CheckAsync(cancellationToken);
+            return tasks.Available ? await store.CheckAsync(cancellationToken) : tasks;
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return SandboxAvailability.No($"The sandbox's cloud ({Name}) doesn't answer: {e.Message}");
+        }
+    }
+
     public async Task<ISandboxContainer> CreateAsync(SandboxContainerSpec spec, CancellationToken cancellationToken = default)
     {
         if (spec.Preparation)

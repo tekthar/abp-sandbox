@@ -10,6 +10,12 @@ public interface ISandbox
     /// <summary>What the configured provider can do.</summary>
     SandboxCapabilities Capabilities { get; }
 
+    /// <summary>
+    /// Whether the sandbox can run now: a provider is set and answers (its answer kept for a minute), and, given an
+    /// image's name, the settings name and pin it. A host offers sandbox work (an agent's tools, say) only while it can.
+    /// </summary>
+    Task<SandboxAvailability> CheckAsync(string? image = null, CancellationToken cancellationToken = default);
+
     /// <summary>Makes a container, gives it the files, runs the command within the limits, and removes it, whatever happened.</summary>
     Task<SandboxResult> RunAsync(SandboxRequest request, CancellationToken cancellationToken = default);
 
@@ -53,6 +59,14 @@ public interface ISandboxSession
 
     /// <summary>Closes the session and removes its container.</summary>
     Task CloseAsync(CancellationToken cancellationToken = default);
+}
+
+/// <summary>Whether the sandbox can run now, and why not when it can't.</summary>
+public sealed record SandboxAvailability(bool Available, string? Why = null)
+{
+    public static readonly SandboxAvailability Yes = new(true);
+
+    public static SandboxAvailability No(string why) => new(false, why);
 }
 
 /// <summary>What a provider can do; the module refuses what it can't.</summary>

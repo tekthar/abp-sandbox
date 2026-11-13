@@ -227,12 +227,21 @@ internal sealed class FakeProvider : ISandboxProvider
     public int Removed;
     public bool NextExecTimesOut;
     public bool FailExec;
+    public SandboxAvailability Availability = SandboxAvailability.Yes;
+    public bool CheckThrows;
+    public int Checks;
     public readonly Dictionary<string, SandboxPreparedImage> Prepared = new();
     private int saved;
 
     public string Name => "fake";
 
     public SandboxCapabilities Capabilities => new(true, true);
+
+    public Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default)
+    {
+        Checks++;
+        return CheckThrows ? throw new HttpRequestException("refused") : Task.FromResult(Availability);
+    }
 
     public Task<ISandboxContainer> CreateAsync(SandboxContainerSpec spec, CancellationToken cancellationToken = default)
     {

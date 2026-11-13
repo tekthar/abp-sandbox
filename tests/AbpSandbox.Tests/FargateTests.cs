@@ -100,6 +100,19 @@ public class FargateTests
     }
 
     [Fact]
+    public async Task Fargate_is_available_while_its_cluster_is_active_and_its_settings_are_there()
+    {
+        FakeEcs ecs = FakeEcs.Create();
+        FargateTaskPlatform platform = new(ecs.Client, Microsoft.Extensions.Options.Options.Create(Options()));
+        Assert.True((await platform.CheckAsync()).Available);
+        ecs.ClusterStatus = "INACTIVE";
+        Assert.Contains("isn't active", (await platform.CheckAsync()).Why);
+        ecs.ClusterStatus = null;
+        Assert.False((await platform.CheckAsync()).Available);
+        Assert.Contains("isn't set up", (await new FargateTaskPlatform(ecs.Client, Microsoft.Extensions.Options.Options.Create(Options().WithoutSubnets())).CheckAsync()).Why);
+    }
+
+    [Fact]
     public async Task Fargates_refusal_says_why()
     {
         FakeEcs ecs = FakeEcs.Create();
@@ -142,6 +155,8 @@ public class FargateTests
 
         public string? Failure { get; set; }
 
+        public string? ClusterStatus { get; set; } = "ACTIVE";
+
         public IAmazonECS Client { get; private set; } = null!;
 
         public static FakeEcs Create()
@@ -160,6 +175,10 @@ public class FargateTests
                 TaskDefinition = new TaskDefinition { Status = TaskDefinitionStatus.ACTIVE, TaskDefinitionArn = "arn:aws:ecs:eu-north-1:123456789012:task-definition/x:1" },
             }),
             nameof(IAmazonECS.RegisterTaskDefinitionAsync) => Register((RegisterTaskDefinitionRequest)args![0]!),
+            nameof(IAmazonECS.DescribeClustersAsync) => Task.FromResult(new DescribeClustersResponse
+            {
+                Clusters = ClusterStatus is null ? [] : [new Cluster { ClusterName = "abp-sandbox", Status = ClusterStatus }],
+            }),
             nameof(IAmazonECS.RunTaskAsync) => Run((RunTaskRequest)args![0]!),
             _ => throw new NotSupportedException(method.Name),
         };

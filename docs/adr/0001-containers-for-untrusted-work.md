@@ -88,6 +88,14 @@ container instead of preparing it again. Production runs where creating containe
      (sessions, preparation); the module refuses what it can't.
    - **Kubernetes** (later): a Job with a sandboxed runtime class (gVisor or Kata).
 
+8. **The provider is a setting, and the sandbox says whether it can run** (0.2.0). A provider's module registers it
+   under a name, and `AbpSandbox:Provider` picks one; none runs until it does, so a host can ship Docker and Fargate
+   and leave each site to choose (none by default, Docker on premises, Fargate on AWS). `ISandbox.CheckAsync` answers
+   whether it can run now: a provider is set and answers, its answer kept for a minute, and, given an image's name,
+   the settings pin it. A host offers sandbox work only while it can: AbpSandbox.Agents lists its tools only then, so
+   an agent is never offered tools that can only fail, and asks AbpAgent's hosts to show the same answer on their own
+   pages (`AvailableToolsAsync`, `CheckAsync`).
+
 ## Consequences
 
 - A host can run package checks without any of them touching its own process, and can check a plugin before it

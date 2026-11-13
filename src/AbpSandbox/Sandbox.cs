@@ -38,6 +38,47 @@ public sealed class Sandbox : ISandbox, IDisposable
 
     public SandboxCapabilities Capabilities => provider.Capabilities;
 
+    private (SandboxAvailability Answer, DateTimeOffset At)? lastCheck;
+
+    public async Task<SandboxAvailability> CheckAsync(string? image = null, CancellationToken cancellationToken = default)
+    {
+        if (image is not null)
+        {
+            try
+            {
+                policy.Image(image);
+            }
+            catch (SandboxRefusedException e)
+            {
+                return SandboxAvailability.No(e.Message);
+            }
+        }
+
+        DateTimeOffset now = clock.GetUtcNow();
+        if (lastCheck is { } last && now - last.At < policy.Options.AvailabilityCacheTime)
+        {
+            return last.Answer;
+        }
+
+        SandboxAvailability answer;
+        try
+        {
+            answer = await provider.CheckAsync(cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            answer = SandboxAvailability.No($"The sandbox's provider ({provider.Name}) doesn't answer: {e.Message}");
+        }
+
+        if (!answer.Available && lastCheck is not { Answer.Available: false })
+        {
+            logger.LogWarning("The sandbox isn't available: {Why}", answer.Why);
+        }
+
+        lastCheck = (answer, now);
+        return answer;
+    }
+
     internal SandboxPolicy Policy => policy;
 
     internal ISandboxProvider Provider => provider;

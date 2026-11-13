@@ -7,7 +7,8 @@ namespace AbpSandbox.Remote;
 /// <summary>What a cloud provider's module registers: the remote provider over its own task platform and object store.</summary>
 public static class RemoteSandboxServices
 {
-    public static IServiceCollection AddRemoteSandbox<TPlatform, TStore>(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="name">The name AbpSandbox:Provider picks it with (fargate, azure).</param>
+    public static IServiceCollection AddRemoteSandbox<TPlatform, TStore>(this IServiceCollection services, IConfiguration configuration, string name)
         where TPlatform : class, ISandboxTaskPlatform
         where TStore : class, ISandboxObjectStore
     {
@@ -15,7 +16,7 @@ public static class RemoteSandboxServices
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ISandboxTaskPlatform, TPlatform>();
         services.AddSingleton<ISandboxObjectStore, TStore>();
-        services.AddSingleton<ISandboxProvider, RemoteSandboxProvider>();
+        services.AddSandboxProvider<RemoteSandboxProvider>(name);
         return services;
     }
 }

@@ -82,6 +82,13 @@ internal sealed class DockerEngine : IDisposable
 
     public static string DefaultEndpoint => OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock";
 
+    /// <summary>Whether the engine answers its ping.</summary>
+    public async Task<bool> PingAsync(CancellationToken ct)
+    {
+        using HttpResponseMessage res = await http.GetAsync("/_ping", ct);
+        return res.IsSuccessStatusCode;
+    }
+
     public async Task<bool> ImageExistsAsync(string reference, CancellationToken ct)
     {
         using HttpResponseMessage res = await http.GetAsync($"{Api}/images/{reference}/json", ct);

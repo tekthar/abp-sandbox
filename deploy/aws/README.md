@@ -28,6 +28,7 @@
 
    ```json
    "AbpSandbox": {
+     "Provider": "fargate",
      "Images": { "tools": "<account>.dkr.ecr.eu-north-1.amazonaws.com/abp-sandbox/images@sha256:..." },
      "Remote": { "RunnerImage": "<account>.dkr.ecr.eu-north-1.amazonaws.com/abp-sandbox/runner@sha256:..." },
      "Fargate": {

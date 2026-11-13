@@ -6,6 +6,9 @@ namespace AbpSandbox.Remote;
 /// </summary>
 public interface ISandboxObjectStore
 {
+    /// <summary>Whether the store answers and its settings are there.</summary>
+    Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default) => Task.FromResult(SandboxAvailability.Yes);
+
     Task PutAsync(string key, byte[] content, CancellationToken cancellationToken = default);
 
     /// <summary>The object, or null when it isn't there (yet).</summary>
@@ -28,6 +31,9 @@ public interface ISandboxObjectStore
 /// </summary>
 public interface ISandboxTaskPlatform
 {
+    /// <summary>Whether the platform answers and its settings are there.</summary>
+    Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default) => Task.FromResult(SandboxAvailability.Yes);
+
     /// <summary>Starts a task and gives its ID; it may still be starting when this returns.</summary>
     Task<string> StartAsync(SandboxTaskSpec spec, CancellationToken cancellationToken = default);
 

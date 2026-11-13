@@ -8,6 +8,15 @@ public class SandboxOptions
 {
     public const string Section = "AbpSandbox";
 
+    /// <summary>
+    /// The provider that runs containers, by the name its module registers it under: docker, fargate. None when unset
+    /// (or "none"), even when provider modules are loaded, so nothing runs until a site says where.
+    /// </summary>
+    public string? Provider { get; set; }
+
+    /// <summary>How long the provider's answer to <see cref="ISandbox.CheckAsync"/> is kept.</summary>
+    public TimeSpan AvailabilityCacheTime { get; set; } = TimeSpan.FromMinutes(1);
+
     /// <summary>Image names requests use, each mapped to a pinned reference (name:tag@sha256:...).</summary>
     public Dictionary<string, string> Images { get; set; } = new(StringComparer.Ordinal);
 

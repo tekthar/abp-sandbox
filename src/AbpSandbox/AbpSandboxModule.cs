@@ -17,21 +17,58 @@ public class AbpSandboxModule : AbpModule
     {
         context.Services.Configure<SandboxOptions>(context.Services.GetConfiguration().GetSection(SandboxOptions.Section));
         context.Services.TryAddSingleton(TimeProvider.System);
-        context.Services.TryAddSingleton<ISandboxProvider, NoSandboxProvider>();
+        context.Services.TryAddSingleton<ISandboxProvider>(SandboxProviders.Pick);
         context.Services.TryAddSingleton<Sandbox>();
         context.Services.TryAddSingleton<ISandbox>(sp => sp.GetRequiredService<Sandbox>());
         context.Services.AddHostedService<SandboxSweeper>();
     }
 }
 
-/// <summary>The provider when the host configured none: it refuses, so nothing runs on the host's own server by accident.</summary>
-public sealed class NoSandboxProvider : ISandboxProvider
+/// <summary>A provider a module offers, by the name AbpSandbox:Provider picks it with.</summary>
+public sealed record SandboxProviderRegistration(string Name, Type Type);
+
+/// <summary>Providers by name: a provider's module registers its own, and AbpSandbox:Provider picks one.</summary>
+public static class SandboxProviders
 {
-    private static SandboxRefusedException None() => new("No sandbox provider is configured: depend on AbpSandbox.Docker or another provider's module.");
+    /// <summary>Registers a provider under a name (docker, fargate) for AbpSandbox:Provider to pick.</summary>
+    public static IServiceCollection AddSandboxProvider<TProvider>(this IServiceCollection services, string name)
+        where TProvider : class, ISandboxProvider
+    {
+        services.TryAddSingleton<TProvider>();
+        services.AddSingleton(new SandboxProviderRegistration(name, typeof(TProvider)));
+        return services;
+    }
+
+    /// <summary>The provider AbpSandbox:Provider names, or one that refuses and says why.</summary>
+    public static ISandboxProvider Pick(IServiceProvider services)
+    {
+        string? name = services.GetRequiredService<IOptions<SandboxOptions>>().Value.Provider?.Trim();
+        SandboxProviderRegistration[] offered = [.. services.GetServices<SandboxProviderRegistration>()];
+        string names = offered.Length == 0 ? "none is loaded" : string.Join(", ", offered.Select(o => o.Name));
+        if (string.IsNullOrEmpty(name) || string.Equals(name, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return new NoSandboxProvider($"No sandbox provider is set (AbpSandbox:Provider; offered: {names}).");
+        }
+
+        SandboxProviderRegistration? picked = offered.LastOrDefault(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase));
+        return picked is null
+            ? new NoSandboxProvider($"AbpSandbox:Provider is '{name}', which no loaded module offers ({names}).")
+            : (ISandboxProvider)services.GetRequiredService(picked.Type);
+    }
+}
+
+/// <summary>The provider when the host set none: it refuses and says why, so nothing runs on the host's own server by accident.</summary>
+public sealed class NoSandboxProvider(string? why = null) : ISandboxProvider
+{
+    private readonly string reason = why ?? "No sandbox provider is set (AbpSandbox:Provider).";
+
+    private SandboxRefusedException None() => new(reason);
 
     public string Name => "none";
 
     public SandboxCapabilities Capabilities => new(false, false);
+
+    public Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default) => Task.FromResult(SandboxAvailability.No(reason));
 
     public Task<ISandboxContainer> CreateAsync(SandboxContainerSpec spec, CancellationToken cancellationToken = default) => throw None();
 

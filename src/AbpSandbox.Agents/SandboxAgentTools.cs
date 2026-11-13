@@ -83,6 +83,16 @@ public sealed class SandboxAgentTools(ISandbox sandbox, IOptions<SandboxAgentToo
 
     public bool Owns(string name) => name is Run or Exec or Put or Get;
 
+    /// <summary>Whether agents' sandbox can run now: a provider is set and answers, and AbpSandbox:Agents:Image is pinned in AbpSandbox:Images.</summary>
+    public Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default) => sandbox.CheckAsync(options.Value.Image, cancellationToken);
+
+    /// <summary>
+    /// The tools while the sandbox is available, none otherwise: what a run is offered, and what a host's own pages
+    /// (an agent's tool settings) should list, so a manager never turns on a tool no run is offered.
+    /// </summary>
+    public async Task<IReadOnlyList<AgentTool>> AvailableToolsAsync(CancellationToken cancellationToken = default) =>
+        (await CheckAsync(cancellationToken)).Available ? Tools : [];
+
     public async Task<AgentToolResult> RunAsync(string name, JsonElement input, AgentActing acting, CancellationToken cancellationToken)
     {
         if (!Owns(name))
@@ -98,6 +108,11 @@ public sealed class SandboxAgentTools(ISandbox sandbox, IOptions<SandboxAgentToo
         if (acting.AgentId is not { } agent)
         {
             return Refuse("The sandbox's tools are an agent's: this run names none.");
+        }
+
+        if (await CheckAsync(cancellationToken) is { Available: false } unavailable)
+        {
+            return Refuse($"The sandbox isn't available: {unavailable.Why}");
         }
 
         string owner = $"agent:{agent:N}/scope:{acting.ScopeId?.ToString("N") ?? "none"}";
@@ -312,14 +327,17 @@ public sealed class SandboxAgentTools(ISandbox sandbox, IOptions<SandboxAgentToo
     private sealed class InputException(string message) : Exception(message);
 }
 
-/// <summary>A host's tools with the sandbox's added: register it as the host's IAgentTools, over the host's own catalog.</summary>
+/// <summary>
+/// A host's tools with the sandbox's added while it's available: register it as the host's IAgentTools, over the host's
+/// own catalog.
+/// </summary>
 public sealed class AgentToolsWithSandbox(IAgentTools host, SandboxAgentTools sandbox) : IAgentTools
 {
     public async Task<IReadOnlyList<AgentTool>> ListAsync(CancellationToken cancellationToken) =>
-        [.. await host.ListAsync(cancellationToken), .. sandbox.Tools];
+        [.. await host.ListAsync(cancellationToken), .. await sandbox.AvailableToolsAsync(cancellationToken)];
 
     public async Task<IReadOnlyList<AgentTool>> ListAsync(AgentToolsFor run, CancellationToken cancellationToken) =>
-        [.. await host.ListAsync(run, cancellationToken), .. sandbox.Tools];
+        [.. await host.ListAsync(run, cancellationToken), .. await sandbox.AvailableToolsAsync(cancellationToken)];
 
     public Task<AgentToolResult> RunAsync(string name, JsonElement input, AgentActing acting, CancellationToken cancellationToken) =>
         sandbox.Owns(name) ? sandbox.RunAsync(name, input, acting, cancellationToken) : host.RunAsync(name, input, acting, cancellationToken);

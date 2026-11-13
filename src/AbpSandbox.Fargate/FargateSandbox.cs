@@ -65,6 +65,20 @@ public sealed class FargateTaskPlatform(IAmazonECS ecs, IOptions<FargateSandboxO
     internal const string StartedBy = "abp-sandbox";
     private readonly ConcurrentDictionary<string, string> definitions = new(StringComparer.Ordinal);
 
+    public async Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default)
+    {
+        FargateSandboxOptions o = options.Value;
+        if (string.IsNullOrEmpty(o.Cluster) || o.Subnets.Count == 0 || o.SecurityGroups.Count == 0 || string.IsNullOrEmpty(o.ExecutionRoleArn))
+        {
+            return SandboxAvailability.No("The Fargate sandbox isn't set up: AbpSandbox:Fargate needs its cluster, subnets, security groups and execution role (deploy/aws).");
+        }
+
+        DescribeClustersResponse found = await ecs.DescribeClustersAsync(new DescribeClustersRequest { Clusters = [o.Cluster] }, cancellationToken);
+        return found.Clusters?.FirstOrDefault() is { Status: "ACTIVE" }
+            ? SandboxAvailability.Yes
+            : SandboxAvailability.No($"The Fargate sandbox's cluster {o.Cluster} isn't there or isn't active.");
+    }
+
     public async Task<string> StartAsync(SandboxTaskSpec spec, CancellationToken cancellationToken = default)
     {
         FargateSandboxOptions o = options.Value;
@@ -320,6 +334,24 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<FargateSandboxOptions> 
     private string Bucket => string.IsNullOrEmpty(options.Value.Bucket)
         ? throw new SandboxRefusedException("The Fargate sandbox has no bucket (AbpSandbox:Fargate:Bucket).")
         : options.Value.Bucket;
+
+    public async Task<SandboxAvailability> CheckAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(options.Value.Bucket))
+        {
+            return SandboxAvailability.No("The Fargate sandbox has no bucket (AbpSandbox:Fargate:Bucket).");
+        }
+
+        try
+        {
+            await s3.ListObjectsV2Async(new ListObjectsV2Request { BucketName = options.Value.Bucket, MaxKeys = 1 }, cancellationToken);
+            return SandboxAvailability.Yes;
+        }
+        catch (AmazonS3Exception e)
+        {
+            return SandboxAvailability.No($"The Fargate sandbox's bucket {options.Value.Bucket} doesn't answer: {e.Message}");
+        }
+    }
 
     public async Task PutAsync(string key, byte[] content, CancellationToken cancellationToken = default) =>
         await s3.PutObjectAsync(new PutObjectRequest { BucketName = Bucket, Key = key, InputStream = new MemoryStream(content, writable: false) }, cancellationToken);
