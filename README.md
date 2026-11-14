@@ -23,7 +23,8 @@ a user that isn't root, within limits of time, memory, CPU, processes and bytes,
 - **The operator's rules:** images are names the settings map to pinned references, never something a request or an
   upload chooses; limits have defaults and maxima; the sweep removes what's past its time, even another server's.
 
-Why and how: [docs/adr/0001](docs/adr/0001-containers-for-untrusted-work.md).
+Why and how: [docs/adr/0001](docs/adr/0001-containers-for-untrusted-work.md). Coming from ABP's module template?
+[Where ABP's layers are in this repository](docs/abp-layers.md).
 
 ## Packages
 
