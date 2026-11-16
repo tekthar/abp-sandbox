@@ -6,6 +6,22 @@ All notable changes to AbpSandbox are written here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-16
+
+The Fargate provider, checked on AWS.
+
+### Fixed
+
+- `AbpSandbox.Fargate` starts its tasks: ECS's RunTask refused the `propagateTags: NONE` the provider sent, so 0.1.0 and
+  0.2.0 couldn't start a Fargate task at all. The field is left out, which passes no tags on to the task, as before.
+
+### Added
+
+- `FargateLiveTests`: the provider against a real deployment of `deploy/aws` (the courier's round trip, no way out to
+  the internet or outside DNS while AWS's names answer, no root or capabilities, the time limit, a session), run with
+  `ABP_SANDBOX_FARGATE=1` and the stack's outputs (deploy/aws/README.md, "Check it").
+- deploy/aws/README.md: the ECS service-linked role a new account needs before the stack, and how to check a deployment.
+
 ## [0.2.0] - 2026-11-13
 
 Knowing whether the sandbox can run, and choosing its provider by a setting.

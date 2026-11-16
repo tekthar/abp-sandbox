@@ -15,6 +15,14 @@
 
 ## Deploy
 
+0. **A new account needs ECS's service-linked role** before its first cluster. Without it, the stack's `Cluster`
+   fails with "Unable to assume the service linked role" and the stack rolls back. Make it once, then delete the
+   rolled-back stack before deploying again:
+
+   ```bash
+   aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com
+   ```
+
 1. Deploy the stack in the project's Region:
 
    ```bash
@@ -43,6 +51,19 @@
    ```
 
    Then depend on `AbpSandboxFargateModule`.
+
+## Check it
+
+`tests/AbpSandbox.Tests/FargateLiveTests.cs` runs real jobs on the deployment: the courier's round trip, no way out to
+the internet or to outside DNS while AWS's own names answer, no root or capabilities, the time limit, and a session.
+Each test starts a Fargate task, a few cents in all. With the AWS SDK's usual credentials and the stack's outputs:
+
+```bash
+export ABP_SANDBOX_FARGATE=1 ABP_SANDBOX_FARGATE_REGION=eu-north-1 ABP_SANDBOX_FARGATE_CLUSTER=abp-sandbox   ABP_SANDBOX_FARGATE_SUBNETS=subnet-...,subnet-... ABP_SANDBOX_FARGATE_SECURITY_GROUP=sg-...   ABP_SANDBOX_FARGATE_EXECUTION_ROLE=arn:aws:iam::... ABP_SANDBOX_FARGATE_BUCKET=...   ABP_SANDBOX_FARGATE_RUNNER=<account>.dkr.ecr.eu-north-1.amazonaws.com/abp-sandbox/runner@sha256:...   ABP_SANDBOX_FARGATE_IMAGE=<account>.dkr.ecr.eu-north-1.amazonaws.com/abp-sandbox/images@sha256:...
+dotnet test tests/AbpSandbox.Tests --filter FullyQualifiedName~FargateLiveTests
+```
+
+The work image needs `sh`, `wget` and `nslookup`. Alpine's busybox has them.
 
 ## What it costs
 

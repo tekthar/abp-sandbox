@@ -117,7 +117,7 @@ public sealed class FargateTaskPlatform(IAmazonECS ecs, IOptions<FargateSandboxO
                 new Tag { Key = "abp-sandbox.owner", Value = spec.OwnerHash },
                 new Tag { Key = "abp-sandbox.expires", Value = spec.ExpiresAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) },
             ],
-            PropagateTags = PropagateTags.NONE,
+            // No PropagateTags: RunTask refuses NONE, and leaving it out passes nothing on to the task.
         }, cancellationToken);
 
         if (response.Tasks is not { Count: > 0 })
