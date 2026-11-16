@@ -78,6 +78,26 @@ The work image needs `sh`, `wget` and `nslookup`. Alpine's busybox has them.
 
 Check the project's plan and spend limit in AWS Settings before deploying.
 
+## Delete it
+
+The stack doesn't delete while it holds things that guard themselves:
+
+1. **The registries must be empty,** untagged image parts too: `aws ecr list-images` and `batch-delete-image` every
+   `imageId` it lists, in both repositories.
+2. **The DNS firewall's association has mutation protection,** so the network's DNS rules can't be lifted by mistake.
+   Turn it off first:
+
+   ```bash
+   aws route53resolver update-firewall-rule-group-association --firewall-rule-group-association-id <id> --mutation-protection DISABLED
+   ```
+
+3. Then `aws cloudformation delete-stack --stack-name abp-sandbox`. The jobs bucket empties itself within a day; one
+   still holding objects stops the delete too.
+
+The task definitions the provider registered (`abpsandbox-*`) stay behind: deregister and delete them with
+`aws ecs deregister-task-definition` and `delete-task-definitions`. ECS's service-linked role stays as well; it costs
+nothing.
+
 ## What Fargate can't do that Docker can
 
 - **No `no-new-privileges`:** Fargate doesn't take it. The work runs as a user that isn't root, with every
